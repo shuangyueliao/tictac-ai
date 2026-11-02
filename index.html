@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="description" content="Tic Tac Pro — hand-drawn tic tac toe vs a tuned AI. Three difficulties plus Ultimate mode (nine boards at once). Free single-file HTML5 game.">
+<meta name="theme-color" content="#f6f0e1">
+<title>Tic Tac Pro</title>
+<script>
+// 平台 SDK 按域名条件加载（独立运行时完全不加载，游戏行为不变）
+(function () {
+  var host = location.hostname || "";
+  try {
+    if (host.indexOf("crazygames") !== -1) {
+      var s1 = document.createElement("script");
+      s1.src = "https://sdk.crazygames.com/crazygames-sdk-v3.js";
+      s1.onload = function () {
+        if (window.CrazyGames && window.CrazyGames.SDK) {
+          window.CrazyGames.SDK.init().then(function () {
+            try { window.CrazyGames.SDK.game.loadingStart(); } catch (e) {}
+            window.addEventListener("load", function () { try { window.CrazyGames.SDK.game.loadingStop(); } catch (e) {} });
+          }).catch(function () {});
+        }
+      };
+      document.head.appendChild(s1);
+      window.__portal = "crazygames";
+    } else if (host.indexOf("gamedistribution") !== -1 || host.indexOf("html5.gamedistribution.com") !== -1 || host.indexOf("gd.games") !== -1) {
+      var s2 = document.createElement("script");
+      s2.src = "https://sdk.gamedistribution.com/v2/main.min.js";
+      document.head.appendChild(s2);
+      window.__portal = "gamedistribution";
+    }
+  } catch (e) {}
+})();
+</script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { height:100%; overflow:hidden; background:#eee4cf; font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; -webkit-user-select:none; user-select:none; }
+  #wrap { height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  #hud { width:100%; max-width:560px; display:flex; justify-content:space-between; align-items:center; padding:10px 14px 6px; color:#4a4238; }
+  .hbtn { background:#fffdf4; border:1.5px solid #cbbfa2; border-radius:10px; padding:7px 10px; font-size:11.5px; font-weight:700; color:#4a4238; cursor:pointer; letter-spacing:.5px; font-family:inherit; }
+  .hbtn:active { transform:scale(.96); }
+  #hudMid { text-align:center; }
+  #hudTitle { font-size:14px; font-weight:900; letter-spacing:3px; color:#d9564a; }
+  #hudInfo { font-size:10.5px; color:#8a7f6a; letter-spacing:1.5px; margin-top:2px; }
+  #stage { position:relative; }
+  canvas { display:block; border-radius:16px; touch-action:none; box-shadow:0 6px 24px rgba(90,70,40,.18); }
+  .layer { position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:rgba(58,50,38,.45); border-radius:16px; z-index:5; }
+  .layer.show { display:flex; }
+  .panel { background:#fffdf4; border:1.5px solid #d8cbae; border-radius:18px; padding:22px 24px; text-align:center; color:#4a4238; width:86%; max-width:340px; box-shadow:0 10px 30px rgba(60,45,25,.28); }
+  .panel h1 { font-size:26px; letter-spacing:4px; color:#d9564a; margin-bottom:2px; }
+  .tagline { font-size:11px; color:#8a7f6a; margin-bottom:8px; letter-spacing:1.5px; }
+  .rowLabel { font-size:10px; letter-spacing:2px; color:#8a7f6a; margin:10px 0 5px; }
+  .seg { display:flex; gap:8px; justify-content:center; }
+  .seg button { flex:1; background:#f4eddc; border:1.5px solid #cbbfa2; border-radius:10px; padding:9px 4px; font-size:12px; font-weight:800; color:#6b6152; cursor:pointer; letter-spacing:.5px; font-family:inherit; }
+  .seg button.on { background:#4a4238; border-color:#4a4238; color:#fffdf4; }
+  #rules { font-size:11.5px; color:#6b6152; line-height:1.5; margin:12px 2px 4px; min-height:50px; }
+  #statsLine { font-size:12px; font-weight:700; color:#3a7bd5; margin:4px 0 12px; letter-spacing:1px; }
+  #playBtn { width:100%; background:linear-gradient(135deg,#3a7bd5,#2b5f9e); color:#fff; border:none; border-radius:12px; padding:13px; font-size:16px; font-weight:900; letter-spacing:2px; cursor:pointer; font-family:inherit; }
+  #playBtn:active { transform:scale(.97); }
+  .panel h2 { font-size:24px; margin-bottom:4px; letter-spacing:1px; }
+  #ovText { color:#6b6152; font-size:12.5px; margin-bottom:10px; line-height:1.5; }
+  #ovStats { font-size:14px; font-weight:900; color:#3a7bd5; margin-bottom:14px; letter-spacing:1px; }
+  .btnrow { display:flex; gap:8px; }
+  .btnrow button { flex:1; border:none; border-radius:11px; padding:11px 6px; font-size:13px; font-weight:800; letter-spacing:1px; cursor:pointer; font-family:inherit; }
+  #againBtn { background:linear-gradient(135deg,#3a7bd5,#2b5f9e); color:#fff; }
+  #menuBtn { background:#f4eddc; border:1.5px solid #cbbfa2; color:#6b6152; }
+  #footer { color:#a2947a; font-size:11px; padding:7px; letter-spacing:.5px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud">
+    <button id="backBtn" class="hbtn">&#8249; MENU</button>
+    <div id="hudMid">
+      <div id="hudTitle">TIC TAC PRO</div>
+      <div id="hudInfo">CLASSIC &middot; NORMAL</div>
+    </div>
+    <button id="muteBtn" class="hbtn">SOUND ON</button>
+  </div>
+  <div id="stage">
+    <canvas id="game"></canvas>
+    <div id="menu" class="layer show"><div class="panel">
+      <h1>TIC TAC PRO</h1>
+      <div class="tagline">HAND-DRAWN TIC TAC TOE VS AI</div>
+      <div class="rowLabel">MODE</div>
+      <div class="seg" id="modeSeg">
+        <button data-v="classic" class="on">CLASSIC</button>
+        <button data-v="ultimate">ULTIMATE</button>
+      </div>
+      <div class="rowLabel">DIFFICULTY</div>
+      <div class="seg" id="lvlSeg">
+        <button data-v="0">EASY</button>
+        <button data-v="1" class="on">NORMAL</button>
+        <button data-v="2">IMPOSSIBLE</button>
+      </div>
+      <div id="rules"></div>
+      <div id="statsLine"></div>
+      <button id="playBtn">PLAY</button>
+    </div></div>
+    <div id="over" class="layer"><div class="panel">
+      <h2 id="ovTitle">Draw</h2>
+      <p id="ovText"></p>
+      <div id="ovStats"></div>
+      <div class="btnrow">
+        <button id="againBtn">REMATCH</button>
+        <button id="menuBtn">MENU</button>
+      </div>
+    </div></div>
+  </div>
+  <div id="footer">Tic Tac Pro &mdash; a free hand-drawn tic tac toe game</div>
+</div>
+<script>
+/* __TTP_LOGIC_START__ */
+// ============ 纯逻辑区：无 DOM、无渲染，可在 node 中直接单测 ============
+var TTP_LINES = [
+  [0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]
+];
+
+// ---------- 经典 3x3 ----------
+// board: 长度 9 的数组，元素 'X' | 'O' | null。返回 {who, line} | {who:null}（平局）| null（未结束）
+function ttpWinner(b) {
+  for (var i = 0; i < 8; i++) {
+    var L = TTP_LINES[i];
+    if (b[L[0]] && b[L[0]] === b[L[1]] && b[L[1]] === b[L[2]]) return { who: b[L[0]], line: L };
+  }
+  for (var j = 0; j < 9; j++) if (!b[j]) return null;
+  return { who: null, line: null }; // 平局
+}
+// 只查连线、不管"满盘"（大盘判定用：'D' 平盘子盘不计入连线）
+function ttpLineOf(arr) {
+  for (var i = 0; i < 8; i++) {
+    var L = TTP_LINES[i];
+    if (arr[L[0]] && arr[L[0]] === arr[L[1]] && arr[L[1]] === arr[L[2]]) return { who: arr[L[0]], line: L };
+  }
+  return null;
+}
+function ttpMoves(b) {
+  var m = [];
+  for (var i = 0; i < 9; i++) if (!b[i]) m.push(i);
+  return m;
+}
+// 完整 minimax（X 视角记分），alpha-beta 剪枝；depth 让 AI 偏好速胜/拖延败局
+function ttpMini(b, turn, depth, alpha, beta) {
+  var w = ttpWinner(b);
+  if (w) {
+    if (w.who === "X") return 10 - depth;
+    if (w.who === "O") return depth - 10;
+    return 0;
+  }
+  var mv = ttpMoves(b), i, s;
+  if (turn === "X") {
+    var best = -Infinity;
+    for (i = 0; i < mv.length; i++) {
+      b[mv[i]] = "X";
+      s = ttpMini(b, "O", depth + 1, alpha, beta);
+      b[mv[i]] = null;
+      if (s > best) best = s;
+      if (best > alpha) alpha = best;
+      if (alpha >= beta) break;
+    }
+    return best;
+  }
+  var worst = Infinity;
+  for (i = 0; i < mv.length; i++) {
+    b[mv[i]] = "O";
+    s = ttpMini(b, "X", depth + 1, alpha, beta);
+    b[mv[i]] = null;
+    if (s < worst) worst = s;
+    if (worst < beta) beta = worst;
+    if (alpha >= beta) break;
+  }
+  return worst;
+}
+// 完整搜索的最优落点；同分随机挑一手（仍然都是最优，不影响不可战胜性）
+function ttpBest(b, me) {
+  var mv = ttpMoves(b);
+  if (mv.length === 0) return -1;
+  var opp = me === "X" ? "O" : "X";
+  var bestS = me === "X" ? -Infinity : Infinity, picks = [];
+  for (var i = 0; i < mv.length; i++) {
+    b[mv[i]] = me;
+    var s = ttpMini(b, opp, 1, -Infinity, Infinity);
+    b[mv[i]] = null;
+    if (me === "X" ? s > bestS : s < bestS) { bestS = s; picks = [mv[i]]; }
+    else if (s === bestS) picks.push(mv[i]);
+  }
+  return picks[Math.floor(Math.random() * picks.length)];
+}
+function ttpRandomMove(b) {
+  var mv = ttpMoves(b);
+  return mv[Math.floor(Math.random() * mv.length)];
+}
+// level 0=Easy(20% 最优) 1=Normal(50% 最优) 2=Impossible(100% 完整 minimax)
+function ttpChooseClassic(b, me, level) {
+  var pBest = level === 0 ? 0.2 : level === 1 ? 0.5 : 1;
+  if (Math.random() < pBest) return ttpBest(b, me);
+  return ttpRandomMove(b);
+}
+
+// ---------- Ultimate（九宫格套九宫格） ----------
+// state = { cells: Array(81) 'X'|'O'|null, owners: Array(9) 'X'|'O'|'D'|null, active: 0-8|null, turn: 'X'|'O' }
+function ttpUState() {
+  var st = { cells: [], owners: [], active: null, turn: "X" };
+  for (var i = 0; i < 81; i++) st.cells[i] = null;
+  for (var j = 0; j < 9; j++) st.owners[j] = null;
+  return st;
+}
+// 合法落点：active 非 null 时只能在活跃子盘内；否则任意未完成子盘的空格
+function ttpULegal(st) {
+  var out = [], sb, p, base;
+  if (st.active !== null) {
+    base = st.active * 9;
+    for (p = 0; p < 9; p++) if (!st.cells[base + p]) out.push(base + p);
+    return out;
+  }
+  for (sb = 0; sb < 9; sb++) {
+    if (st.owners[sb] !== null) continue;
+    base = sb * 9;
+    for (p = 0; p < 9; p++) if (!st.cells[base + p]) out.push(base + p);
+  }
+  return out;
+}
+// 应用一手：返回 {ok, over, subWin, sb, mover, prev}；非法时 {ok:false}
+function ttpUApply(st, idx) {
+  var legal = ttpULegal(st);
+  if (legal.indexOf(idx) === -1) return { ok: false };
+  var sb = Math.floor(idx / 9), pos = idx % 9;
+  var mover = st.turn;
+  var prev = { owner: st.owners[sb], active: st.active };
+  st.cells[idx] = mover;
+  // 子盘完成判定：胜者或满盘平（D）
+  var sub = st.cells.slice(sb * 9, sb * 9 + 9);
+  var w = ttpWinner(sub);
+  if (w && w.who) st.owners[sb] = w.who;
+  else if (w && !w.who) st.owners[sb] = "D";
+  // 大盘判定（D 不计入连线；9 个子盘全部有主且无三连 → 平局）
+  var bigArr = [];
+  for (var i = 0; i < 9; i++) {
+    var o = st.owners[i];
+    bigArr[i] = (o === "X" || o === "O") ? o : null;
+  }
+  var big = ttpLineOf(bigArr);
+  var over = null;
+  if (big) over = { winner: big.who, line: big.line };
+  else {
+    var full = true;
+    for (var f2 = 0; f2 < 9; f2++) if (st.owners[f2] === null) { full = false; break; }
+    if (full) over = { winner: null, line: null }; // 大盘全满且无三连 → 平局
+  }
+  // 落子的小格位置决定对手的活跃子盘；该盘已完成则任意下
+  st.active = over ? null : (st.owners[pos] === null ? pos : null);
+  st.turn = mover === "X" ? "O" : "X";
+  // subWin 只报真实占领（X/O），子盘打平（D）静默处理
+  return { ok: true, over: over, subWin: (prev.owner === null && (st.owners[sb] === "X" || st.owners[sb] === "O")) ? st.owners[sb] : null, sb: sb, mover: mover, prev: prev };
+}
+function ttpUUndo(st, idx, res) {
+  st.cells[idx] = null;
+  st.owners[res.sb] = res.prev.owner;
+  st.active = res.prev.active;
+  st.turn = res.mover;
+}
+
+// ---------- Ultimate AI（启发式 + 有限深度搜索；经典模式的 minimax 才承诺不可战胜） ----------
+var SBW = [1.2, 1, 1.2, 1, 1.5, 1, 1.2, 1, 1.2]; // 子盘权重：中 > 角 > 边
+function ttpUEval(st) { // X 视角
+  var s = 0, big = [], i, j, k, L;
+  for (i = 0; i < 9; i++) {
+    var o = st.owners[i];
+    big[i] = (o === "X" || o === "O") ? o : null;
+    if (o === "X") s += 6 * SBW[i];
+    else if (o === "O") s -= 6 * SBW[i];
+  }
+  for (i = 0; i < 8; i++) { // 大盘双连威胁
+    L = TTP_LINES[i]; var mx = 0, mo = 0;
+    for (j = 0; j < 3; j++) { var v = big[L[j]]; if (v === "X") mx++; else if (v === "O") mo++; }
+    if (mx === 2 && mo === 0) s += 4;
+    else if (mo === 2 && mx === 0) s -= 4;
+  }
+  for (i = 0; i < 9; i++) { // 未决子盘内部
+    if (st.owners[i] !== null) continue;
+    var base = i * 9;
+    for (j = 0; j < 8; j++) {
+      L = TTP_LINES[j]; var nx = 0, no = 0;
+      for (k = 0; k < 3; k++) {
+        var v2 = st.cells[base + L[k]];
+        if (v2 === "X") nx++; else if (v2 === "O") no++;
+      }
+      if (nx === 2 && no === 0) s += 1.5 * SBW[i];
+      else if (no === 2 && nx === 0) s -= 1.5 * SBW[i];
+    }
+    if (st.cells[base + 4] === "X") s += 0.8 * SBW[i];
+    else if (st.cells[base + 4] === "O") s -= 0.8 * SBW[i];
+  }
+  return s;
+}
+function ttpUSearch(st, depth, alpha, beta) { // X 视角 minimax
+  var me = st.turn;
+  var maxing = me === "X";
+  var mv = ttpULegal(st);
+  var best = maxing ? -Infinity : Infinity;
+  for (var i = 0; i < mv.length; i++) {
+    var idx = mv[i];
+    var r = ttpUApply(st, idx);
+    var s;
+    if (r.over) s = r.over.winner === "X" ? 900 + depth : r.over.winner === null ? 0 : -900 - depth;
+    else if (depth <= 1) s = ttpUEval(st);
+    else s = ttpUSearch(st, depth - 1, alpha, beta);
+    ttpUUndo(st, idx, r);
+    if (maxing) { if (s > best) best = s; if (best > alpha) alpha = best; }
+    else { if (s < best) best = s; if (best < beta) beta = best; }
+    if (alpha >= beta) break;
+  }
+  return best;
+}
+function ttpUDepthFor(st, level) {
+  var n = ttpULegal(st).length;
+  var d = level >= 2 ? 3 : level === 1 ? 2 : 1;
+  if (n > 24) d = Math.min(d, 2); // 分支过大时降深，保证移动端即时响应
+  if (n > 40) d = Math.min(d, 1);
+  return d;
+}
+function ttpUBest(st, depth) {
+  var mv = ttpULegal(st);
+  if (mv.length === 0) return -1;
+  var me = st.turn;
+  var bestS = me === "X" ? -Infinity : Infinity, picks = [];
+  for (var i = 0; i < mv.length; i++) {
+    var r = ttpUApply(st, mv[i]);
+    var s;
+    if (r.over) s = r.over.winner === "X" ? 900 : r.over.winner === null ? 0 : -900;
+    else if (depth <= 1) s = ttpUEval(st);
+    else s = ttpUSearch(st, depth - 1, -Infinity, Infinity);
+    ttpUUndo(st, mv[i], r);
+    if (me === "X" ? s > bestS : s < bestS) { bestS = s; picks = [mv[i]]; }
+    else if (s === bestS) picks.push(mv[i]);
+  }
+  return picks[Math.floor(Math.random() * picks.length)];
+}
+function ttpUChoose(st, level) {
+  if (level === 0) {
+    if (Math.random() < 0.2) return ttpUBest(st, ttpUDepthFor(st, 1));
+    var mv = ttpULegal(st);
+    return mv[Math.floor(Math.random() * mv.length)];
+  }
+  return ttpUBest(st, ttpUDepthFor(st, level));
+}
+/* __TTP_LOGIC_END__ */
+if (typeof window !== "undefined") {
+  window.TTPLogic = {
+    TTP_LINES: TTP_LINES,
+    ttpWinner: ttpWinner, ttpLineOf: ttpLineOf, ttpMoves: ttpMoves, ttpMini: ttpMini, ttpBest: ttpBest,
+    ttpRandomMove: ttpRandomMove, ttpChooseClassic: ttpChooseClassic,
+    ttpUState: ttpUState, ttpULegal: ttpULegal, ttpUApply: ttpUApply, ttpUUndo: ttpUUndo,
+    ttpUEval: ttpUEval, ttpUSearch: ttpUSearch, ttpUDepthFor: ttpUDepthFor, ttpUBest: ttpUBest, ttpUChoose: ttpUChoose
+  };
+}
+</script>
+<script>
+"use strict";
+// ================= 渲染 / 交互 / 音频 / 界面 =================
+var W = 480, H = 680;
+var BX = 12, BY = 118, BS = 456;           // 棋盘方框
+var TTP = window.TTPLogic;
+var LV_NAMES = ["EASY", "NORMAL", "IMPOSSIBLE"];
+var MODE_NAMES = { classic: "CLASSIC", ultimate: "ULTIMATE" };
+var DUR_X = 0.5, DUR_O = 0.34;             // 笔画动画时长
+
+var canvas = document.getElementById("game");
+var ctx = canvas.getContext("2d");
+var dpr = Math.min(window.devicePixelRatio || 1, 2);
+canvas.width = W * dpr; canvas.height = H * dpr;
+ctx.scale(dpr, dpr);
+
+var C = {
+  ink: "#4a4238", faint: "#8a7f6a",
+  x: "#d9564a", o: "#3a7bd5", win: "#2f9e63",
+  xTint: "rgba(217,86,74,.09)", oTint: "rgba(58,123,213,.09)", dTint: "rgba(74,66,56,.08)"
+};
+
+var app = {
+  screen: "menu",            // menu | play
+  mode: "classic", level: 1,
+  cells: [],                 // classic: 9 格
+  u: null,                   // ultimate: {cells, owners, active, turn}
+  turn: "X",
+  over: null,                // {winner:'X'|'O'|null, line, kind}
+  marks: [], winLine: null, pulses: [],
+  aiPending: false, aiAt: 0,
+  gridSeed: 1, flashT: 0, roundActive: false
+};
+
+// ---------- 音效（WebAudio 合成，无外部资源） ----------
+var actx = null, muted = false;
+try { muted = localStorage.getItem("ttp_muted") === "1"; } catch (e) {}
+function ensureAudio() {
+  try {
+    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === "suspended") actx.resume();
+  } catch (e) {}
+}
+function beep(freq, dur, type, gainv, delay) {
+  if (muted) return;
+  try {
+    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === "suspended") actx.resume();
+    var t0 = actx.currentTime + (delay || 0);
+    var o = actx.createOscillator(), g = actx.createGain();
+    o.type = type || "sine"; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(gainv || 0.1, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    o.connect(g); g.connect(actx.destination);
+    o.start(t0); o.stop(t0 + dur + 0.03);
+  } catch (e) {}
+}
+function sfxStroke(i) { beep(480 + i * 190, 0.06, "triangle", 0.08); }
+function sfxO() { beep(400, 0.1, "sine", 0.08); beep(560, 0.08, "sine", 0.05, 0.05); }
+function sfxWin() { [523, 659, 784, 1047].forEach(function (f, i) { beep(f, 0.16, "triangle", 0.1, i * 0.11); }); }
+function sfxLose() { [392, 311, 262, 196].forEach(function (f, i) { beep(f, 0.18, "sawtooth", 0.05, i * 0.12); }); }
+function sfxDraw() { beep(440, 0.14, "sine", 0.07); beep(440, 0.16, "sine", 0.07, 0.2); }
+function sfxUI() { beep(760, 0.045, "sine", 0.05); }
+function sfxBuzz() { beep(150, 0.08, "square", 0.04); }
+function sfxCapture() { beep(660, 0.09, "triangle", 0.08); beep(880, 0.12, "triangle", 0.08, 0.08); }
+
+// ---------- 战绩（localStorage，全部 try/catch） ----------
+var stats = null;
+function loadStats() {
+  var s = { classic: [{ w: 0, l: 0, d: 0 }, { w: 0, l: 0, d: 0 }, { w: 0, l: 0, d: 0 }],
+            ultimate: [{ w: 0, l: 0, d: 0 }, { w: 0, l: 0, d: 0 }, { w: 0, l: 0, d: 0 }] };
+  try {
+    var raw = localStorage.getItem("ttp_stats_v1");
+    if (raw) {
+      var p = JSON.parse(raw);
+      ["classic", "ultimate"].forEach(function (m) {
+        for (var lv = 0; lv < 3; lv++) {
+          if (p && p[m] && p[m][lv]) s[m][lv] = { w: p[m][lv].w | 0, l: p[m][lv].l | 0, d: p[m][lv].d | 0 };
+        }
+      });
+    }
+  } catch (e) {}
+  return s;
+}
+function saveStats() { try { localStorage.setItem("ttp_stats_v1", JSON.stringify(stats)); } catch (e) {} }
+stats = loadStats();
+
+// ---------- 平台埋点（SDK 已做域名守卫，独立运行时 window.__portal 未定义，全部为空操作） ----------
+function portalStart() {
+  try {
+    if (window.__portal === "crazygames" && window.CrazyGames && window.CrazyGames.SDK) window.CrazyGames.SDK.game.gameplayStart();
+    else if (window.__portal === "gamedistribution" && window.GameDistributionSDK && window.GameDistributionSDK.game) window.GameDistributionSDK.game.gameplayStart();
+  } catch (e) {}
+}
+function portalStop() {
+  try {
+    if (window.__portal === "crazygames" && window.CrazyGames && window.CrazyGames.SDK) window.CrazyGames.SDK.game.gameplayStop();
+    else if (window.__portal === "gamedistribution" && window.GameDistributionSDK && window.GameDistributionSDK.game) window.GameDistributionSDK.game.gameplayStop();
+  } catch (e) {}
+}
+function portalHappy() {
+  try {
+    if (window.__portal === "crazygames" && window.CrazyGames && window.CrazyGames.SDK) window.CrazyGames.SDK.game.happytime();
+  } catch (e) {}
+}
+
+// ---------- 几何 ----------
+function subSize() { return BS / 3; }
+function cellSize() { return BS / 9; }
+function cellCenter(idx, kind) {
+  var sub = subSize(), cl = cellSize();
+  if (kind === "classic") {
+    var cs = BS / 3;
+    return [BX + (idx % 3) * cs + cs / 2, BY + Math.floor(idx / 3) * cs + cs / 2];
+  }
+  var sb = Math.floor(idx / 9), p = idx % 9;
+  return [BX + (sb % 3) * sub + (p % 3) * cl + cl / 2, BY + Math.floor(sb / 3) * sub + Math.floor(p / 3) * cl + cl / 2];
+}
+function subRect(sb) {
+  var sub = subSize();
+  return [BX + (sb % 3) * sub, BY + Math.floor(sb / 3) * sub, sub, sub];
+}
+function markGeo(idx) {
+  var big = app.mode === "classic";
+  var span = big ? BS / 3 : cellSize();
+  var c = cellCenter(idx, big ? "classic" : "ult");
+  return { x: c[0], y: c[1], s: span * 0.29, lw: big ? 11 : 4.6 };
+}
+
+// ---------- 手绘感小工具 ----------
+function rnd(seed) { var s = Math.sin(seed * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); }
+function ease(t) { return t * t * (3 - 2 * t); }
+function roundRect(c, x, y, w, h, rad) {
+  c.beginPath();
+  c.moveTo(x + rad, y);
+  c.arcTo(x + w, y, x + w, y + h, rad);
+  c.arcTo(x + w, y + h, x, y + h, rad);
+  c.arcTo(x, y + h, x, y, rad);
+  c.arcTo(x, y, x + w, y, rad);
+  c.closePath();
+}
+function wobbleLine(x0, y0, x1, y1, amp, seed) {
+  var n = 7, dx = x1 - x0, dy = y1 - y0, len = Math.sqrt(dx * dx + dy * dy) || 1;
+  ctx.beginPath();
+  for (var i = 0; i <= n; i++) {
+    var t = i / n, x = x0 + dx * t, y = y0 + dy * t;
+    var off = (rnd(seed + i * 1.37) - 0.5) * 2 * amp * (i === 0 || i === n ? 0.25 : 1);
+    var px = x + (-dy / len) * off, py = y + (dx / len) * off;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+}
+// 二次贝塞尔的部分绘制（de Casteljau 拆分），用于 X 的分笔动画
+function drawQuad(p0, c, p1, t) {
+  if (t <= 0) return;
+  if (t > 1) t = 1;
+  var q1 = [p0[0] + (c[0] - p0[0]) * t, p0[1] + (c[1] - p0[1]) * t];
+  var q2 = [p0[0] * (1 - t) * (1 - t) + 2 * (1 - t) * t * c[0] + t * t * p1[0],
+            p0[1] * (1 - t) * (1 - t) + 2 * (1 - t) * t * c[1] + t * t * p1[1]];
+  ctx.beginPath();
+  ctx.moveTo(p0[0], p0[1]);
+  ctx.quadraticCurveTo(q1[0], q1[1], q2[0], q2[1]);
+  ctx.stroke();
+}
+function drawXMark(m, p) {
+  var s = m.s;
+  var j1 = (rnd(m.seed) - 0.5) * s * 0.22, j2 = (rnd(m.seed + 1) - 0.5) * s * 0.22;
+  ctx.strokeStyle = C.x; ctx.lineWidth = m.lw; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  var t1 = Math.min(1, p / 0.45);
+  drawQuad([m.x - s, m.y - s], [m.x + j1, m.y - j1 * 0.6], [m.x + s, m.y + s], ease(t1));
+  var t2 = Math.max(0, Math.min(1, (p - 0.55) / 0.45));
+  drawQuad([m.x + s, m.y - s], [m.x + j2, m.y + j2 * 0.6], [m.x - s, m.y + s], ease(t2));
+}
+function drawOMark(m, p) {
+  var R = m.s * 1.04;
+  var a0 = -Math.PI / 2 + (rnd(m.seed) - 0.5) * 0.7;
+  var segs = 34, total = Math.PI * 2 * 1.04 * ease(Math.min(1, Math.max(0, p)));
+  ctx.strokeStyle = C.o; ctx.lineWidth = m.lw; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.beginPath();
+  for (var i = 0; i <= segs; i++) {
+    var a = a0 + total * i / segs;
+    var rr = R + Math.sin(a * 2.1 + m.seed) * R * 0.055;
+    var x = m.x + Math.cos(a) * rr, y = m.y + Math.sin(a) * rr;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+}
+
+// ---------- 对局流程 ----------
+function startRound() {
+  app.screen = "play";
+  app.over = null; app.marks = []; app.winLine = null; app.pulses = [];
+  app.turn = "X"; app.aiPending = false; app.flashT = 0; app.roundActive = true;
+  app.gridSeed = Math.floor(Math.random() * 100000);
+  var i;
+  if (app.mode === "classic") {
+    app.cells = [];
+    for (i = 0; i < 9; i++) app.cells[i] = null;
+    app.u = null;
+  } else {
+    app.u = TTP.ttpUState();
+    app.cells = [];
+  }
+  document.getElementById("menu").classList.remove("show");
+  document.getElementById("over").classList.remove("show");
+  document.getElementById("hudInfo").textContent = MODE_NAMES[app.mode] + " \u00B7 " + LV_NAMES[app.level];
+  // 平台埋点：一局开始
+  portalStart();
+}
+function toMenu() {
+  if (app.roundActive && !app.over) portalStop(); // 中途弃局也要停表
+  app.roundActive = false;
+  app.screen = "menu";
+  document.getElementById("over").classList.remove("show");
+  refreshMenu();
+  document.getElementById("menu").classList.add("show");
+}
+function spawnMark(idx, mover) {
+  var g = markGeo(idx);
+  app.marks.push({ idx: idx, type: mover, t: 0, seed: (idx * 3.71 + app.gridSeed * 0.917) % 997, x: g.x, y: g.y, s: g.s, lw: g.lw, s2Done: false });
+  if (mover === "X") sfxStroke(0); else sfxO();
+}
+function doMove(idx, mover) {
+  if (app.mode === "classic") {
+    app.cells[idx] = mover;
+    spawnMark(idx, mover);
+    var w = TTP.ttpWinner(app.cells);
+    if (w) finishRound(w.who, w.line, "classic");
+    else app.turn = mover === "X" ? "O" : "X";
+  } else {
+    var st = app.u;
+    var r = TTP.ttpUApply(st, idx);
+    if (!r.ok) return;
+    spawnMark(idx, mover);
+    if (r.subWin) { app.pulses.push({ sb: r.sb, t: 0, who: r.subWin }); sfxCapture(); }
+    if (r.over) finishRound(r.over.winner, r.over.line, "ultimate");
+    else app.turn = st.turn;
+  }
+}
+function finishRound(winner, line, kind) {
+  app.over = { winner: winner, line: line || null, kind: kind };
+  app.turn = null;
+  app.roundActive = false;
+  if (line) app.winLine = { line: line, t: 0 };
+  var key = winner === "X" ? "w" : winner === "O" ? "l" : "d";
+  stats[app.mode][app.level][key]++;
+  saveStats();
+  // 平台埋点：一局结束
+  portalStop();
+  if (winner === "X") { sfxWin(); portalHappy(); }
+  else if (winner === "O") sfxLose();
+  else sfxDraw();
+  setTimeout(showResult, 1250);
+}
+function showResult() {
+  if (!app.over) return;
+  var o = app.over, s = stats[app.mode][app.level];
+  var t, d;
+  if (o.winner === "X") {
+    t = "You Win!";
+    d = app.mode === "classic" ? "Three in a row \u2014 sharp eyes." : "You took the big board. Masterful.";
+  } else if (o.winner === "O") {
+    t = "AI Wins";
+    d = app.mode === "classic" ? "The AI connected three. Rematch?" : "The AI claimed the big board. One more try?";
+  } else {
+    t = "Draw";
+    d = app.mode === "classic"
+      ? (app.level === 2 ? "A perfect duel \u2014 nobody gives an inch." : "Nobody connected three.")
+      : "All nine boards settled, no big three.";
+  }
+  document.getElementById("ovTitle").textContent = t;
+  document.getElementById("ovText").textContent = d;
+  document.getElementById("ovStats").textContent = "W " + s.w + " \u00B7 L " + s.l + " \u00B7 D " + s.d + "  \u00B7  " + LV_NAMES[app.level];
+  document.getElementById("over").classList.add("show");
+}
+
+// ---------- 菜单 ----------
+function rulesText() {
+  var diff;
+  if (app.mode === "classic") {
+    diff = app.level === 0 ? " The AI plays loosely."
+         : app.level === 1 ? " A balanced opponent."
+         : " Full minimax \u2014 the AI cannot be beaten. A draw is a trophy.";
+    return "You are X and move first. Three in a row wins." + diff;
+  }
+  diff = app.level === 0 ? " The AI plays loosely."
+       : app.level === 1 ? " A balanced opponent."
+       : " The AI plans ahead and punishes loose sends.";
+  return "Nine boards at once. Your square sends the AI to the matching board; win a small board to claim it \u2014 take three big boards in a row to win." + diff;
+}
+function refreshMenu() {
+  var segs = [document.getElementById("modeSeg"), document.getElementById("lvlSeg")];
+  segs[0].querySelectorAll("button").forEach(function (b) { b.classList.toggle("on", b.dataset.v === app.mode); });
+  segs[1].querySelectorAll("button").forEach(function (b) { b.classList.toggle("on", +b.dataset.v === app.level); });
+  document.getElementById("rules").textContent = rulesText();
+  var s = stats[app.mode][app.level];
+  document.getElementById("statsLine").textContent = "W " + s.w + " \u00B7 L " + s.l + " \u00B7 D " + s.d;
+  document.getElementById("hudInfo").textContent = MODE_NAMES[app.mode] + " \u00B7 " + LV_NAMES[app.level];
+}
+document.getElementById("modeSeg").addEventListener("click", function (e) {
+  var b = e.target.closest("button"); if (!b) return;
+  app.mode = b.dataset.v; sfxUI(); refreshMenu();
+});
+document.getElementById("lvlSeg").addEventListener("click", function (e) {
+  var b = e.target.closest("button"); if (!b) return;
+  app.level = +b.dataset.v; sfxUI(); refreshMenu();
+});
+document.getElementById("playBtn").addEventListener("click", function () { ensureAudio(); sfxUI(); startRound(); });
+document.getElementById("againBtn").addEventListener("click", function () { ensureAudio(); sfxUI(); startRound(); });
+document.getElementById("menuBtn").addEventListener("click", function () { sfxUI(); toMenu(); });
+document.getElementById("backBtn").addEventListener("click", function () { ensureAudio(); sfxUI(); if (app.screen === "play") toMenu(); });
+var muteBtn = document.getElementById("muteBtn");
+function syncMute() { muteBtn.textContent = muted ? "SOUND OFF" : "SOUND ON"; }
+muteBtn.addEventListener("click", function () {
+  muted = !muted;
+  try { localStorage.setItem("ttp_muted", muted ? "1" : "0"); } catch (e) {}
+  syncMute();
+  if (!muted) { ensureAudio(); sfxUI(); }
+});
+syncMute();
+
+// ---------- 输入（点击 / 触控） ----------
+function evtPoint(e) {
+  var t = e.touches && e.touches[0] ? e.touches[0] : e;
+  return [t.clientX, t.clientY];
+}
+function pickCell(clientX, clientY) {
+  var rect = canvas.getBoundingClientRect();
+  var x = (clientX - rect.left) / rect.width * W;
+  var y = (clientY - rect.top) / rect.height * H;
+  if (x < BX || x > BX + BS || y < BY || y > BY + BS) return -1;
+  var sub = subSize(), cl = cellSize();
+  if (app.mode === "classic") {
+    var cs = BS / 3;
+    var c = Math.floor((x - BX) / cs), r = Math.floor((y - BY) / cs);
+    if (c < 0 || c > 2 || r < 0 || r > 2) return -1;
+    return r * 3 + c;
+  }
+  var sc = Math.floor((x - BX) / sub), sr = Math.floor((y - BY) / sub);
+  if (sc < 0 || sc > 2 || sr < 0 || sr > 2) return -1;
+  var pc = Math.floor((x - BX - sc * sub) / cl), pr = Math.floor((y - BY - sr * sub) / cl);
+  if (pc < 0 || pc > 2 || pr < 0 || pr > 2) return -1;
+  return (sr * 3 + sc) * 9 + pr * 3 + pc;
+}
+function onTap(e) {
+  ensureAudio();
+  if (app.screen !== "play" || app.over || app.turn !== "X") return;
+  var pt = evtPoint(e);
+  var idx = pickCell(pt[0], pt[1]);
+  if (idx < 0) return;
+  var legal = app.mode === "classic" ? TTP.ttpMoves(app.cells) : TTP.ttpULegal(app.u);
+  if (legal.indexOf(idx) === -1) { sfxBuzz(); app.flashT = 0.55; return; }
+  doMove(idx, "X");
+}
+canvas.addEventListener("mousedown", function (e) { onTap(e); });
+canvas.addEventListener("touchstart", function (e) { e.preventDefault(); onTap(e); }, { passive: false });
+canvas.addEventListener("touchmove", function (e) { e.preventDefault(); }, { passive: false });
+
+// ---------- AI 落子调度 ----------
+function aiMove() {
+  var idx;
+  if (app.mode === "classic") idx = TTP.ttpChooseClassic(app.cells, "O", app.level);
+  else idx = TTP.ttpUChoose(app.u, app.level);
+  if (idx >= 0) doMove(idx, "O");
+}
+
+// ---------- 更新 ----------
+var nowS = 0;
+function update(dt) {
+  var i, m;
+  for (i = app.marks.length - 1; i >= 0; i--) {
+    m = app.marks[i];
+    m.t += dt;
+    if (m.type === "X" && !m.s2Done && m.t / DUR_X > 0.55) { m.s2Done = true; sfxStroke(1); }
+  }
+  for (i = app.pulses.length - 1; i >= 0; i--) {
+    app.pulses[i].t += dt / 0.45;
+    if (app.pulses[i].t >= 1) app.pulses.splice(i, 1);
+  }
+  if (app.winLine && app.winLine.t < 1) app.winLine.t = Math.min(1, app.winLine.t + dt / 0.55);
+  if (app.flashT > 0) app.flashT = Math.max(0, app.flashT - dt);
+  if (app.screen === "play" && !app.over && app.turn === "O") {
+    if (!app.aiPending) { app.aiPending = true; app.aiAt = nowS + 0.5 + Math.random() * 0.45; }
+    else if (nowS >= app.aiAt) { app.aiPending = false; aiMove(); }
+  }
+}
+
+// ---------- 渲染 ----------
+function drawBoardPlate() {
+  ctx.save();
+  ctx.shadowColor = "rgba(90,70,40,.14)"; ctx.shadowBlur = 16;
+  ctx.fillStyle = "rgba(255,253,244,.55)";
+  roundRect(ctx, BX - 7, BY - 7, BS + 14, BS + 14, 18);
+  ctx.fill();
+  ctx.restore();
+}
+function drawUltHighlights(time) {
+  var i, r;
+  var pulse = 0.5 + 0.5 * Math.sin(time * 4);
+  if (app.u.active !== null) {
+    r = subRect(app.u.active);
+    ctx.fillStyle = "rgba(246,193,65," + (0.16 + 0.12 * pulse) + ")";
+    roundRect(ctx, r[0] + 3, r[1] + 3, r[2] - 6, r[3] - 6, 10); ctx.fill();
+  } else if (!app.over) {
+    for (i = 0; i < 9; i++) {
+      if (app.u.owners[i] !== null) continue;
+      r = subRect(i);
+      ctx.fillStyle = "rgba(246,193,65," + (0.06 + 0.05 * pulse) + ")";
+      roundRect(ctx, r[0] + 3, r[1] + 3, r[2] - 6, r[3] - 6, 10); ctx.fill();
+    }
+  }
+}
+function drawOwnedBoards() {
+  var i, r, fake;
+  for (i = 0; i < 9; i++) {
+    var o = app.u.owners[i];
+    if (!o) continue;
+    r = subRect(i);
+    ctx.fillStyle = o === "X" ? C.xTint : o === "O" ? C.oTint : C.dTint;
+    roundRect(ctx, r[0] + 3, r[1] + 3, r[2] - 6, r[3] - 6, 10); ctx.fill();
+    if (o !== "D") {
+      fake = { x: r[0] + r[2] / 2, y: r[1] + r[3] / 2, s: r[2] * 0.27, lw: 8, seed: i * 5.13 + app.gridSeed * 0.317 };
+      ctx.save(); ctx.globalAlpha = 0.15;
+      if (o === "X") drawXMark(fake, 1); else drawOMark(fake, 1);
+      ctx.restore();
+    }
+  }
+}
+function drawGrid() {
+  ctx.strokeStyle = C.ink; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  var i, j, r, sub = subSize(), seed = app.gridSeed;
+  var ult = app.mode === "ultimate" && app.u; // 菜单里还未开局时 u 为空，退回画经典格
+  if (!ult) {
+    ctx.lineWidth = 5; ctx.globalAlpha = 0.85;
+    for (i = 1; i <= 2; i++) {
+      wobbleLine(BX + i * sub, BY + 5, BX + i * sub, BY + BS - 5, 2.2, seed + i * 7);
+      wobbleLine(BX + 5, BY + i * sub, BX + BS - 5, BY + i * sub, 2.2, seed + 30 + i * 7);
+    }
+    ctx.globalAlpha = 1;
+  } else {
+    // 未决子盘画浅色内格
+    for (i = 0; i < 9; i++) {
+      if (app.u.owners[i] !== null) continue;
+      r = subRect(i);
+      ctx.lineWidth = 1.5; ctx.globalAlpha = 0.32;
+      for (j = 1; j <= 2; j++) {
+        wobbleLine(r[0] + j * cellSize(), r[1] + 3, r[0] + j * cellSize(), r[1] + r[3] - 3, 1.1, seed + i * 9 + j);
+        wobbleLine(r[0] + 3, r[1] + j * cellSize(), r[0] + r[2] - 3, r[1] + j * cellSize(), 1.1, seed + 40 + i * 9 + j);
+      }
+    }
+    // 粗分隔线 + 外框
+    ctx.lineWidth = 4.5; ctx.globalAlpha = 0.85;
+    for (i = 1; i <= 2; i++) {
+      wobbleLine(BX + i * sub, BY + 5, BX + i * sub, BY + BS - 5, 2, seed + 80 + i * 7);
+      wobbleLine(BX + 5, BY + i * sub, BX + BS - 5, BY + i * sub, 2, seed + 100 + i * 7);
+    }
+    ctx.globalAlpha = 0.55; ctx.lineWidth = 3;
+    roundRect(ctx, BX + 2, BY + 2, BS - 4, BS - 4, 14); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+}
+function drawMarks() {
+  var dim = app.over && app.over.winner ? 0.45 : 1;
+  for (var i = 0; i < app.marks.length; i++) {
+    var m = app.marks[i];
+    var p = Math.min(1, m.t / (m.type === "X" ? DUR_X : DUR_O));
+    ctx.save();
+    ctx.globalAlpha = dim;
+    if (m.type === "X") drawXMark(m, p); else drawOMark(m, p);
+    ctx.restore();
+  }
+}
+function drawPulses() {
+  for (var i = 0; i < app.pulses.length; i++) {
+    var p = app.pulses[i];
+    var r = subRect(p.sb), grow = p.t * 9;
+    ctx.strokeStyle = p.who === "X" ? C.x : p.who === "O" ? C.o : C.ink;
+    ctx.globalAlpha = (1 - p.t) * 0.85;
+    ctx.lineWidth = 4.5;
+    roundRect(ctx, r[0] + 3 - grow, r[1] + 3 - grow, r[2] - 6 + grow * 2, r[3] - 6 + grow * 2, 10);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+}
+function drawWinLine() {
+  var wl = app.winLine;
+  if (!wl || wl.t <= 0) return;
+  var kind = app.over.kind;
+  var span = kind === "classic" ? BS / 3 : subSize();
+  var a = cellCenter(wl.line[0], kind === "classic" ? "classic" : "ult");
+  var b = cellCenter(wl.line[2], kind === "classic" ? "classic" : "ult");
+  var dx = b[0] - a[0], dy = b[1] - a[1], len = Math.sqrt(dx * dx + dy * dy) || 1;
+  var ext = span * 0.22;
+  var ax = a[0] - dx / len * ext, ay = a[1] - dy / len * ext;
+  var t = ease(wl.t);
+  var bx = ax + (b[0] + dx / len * ext - ax) * t, by = ay + (b[1] + dy / len * ext - ay) * t;
+  ctx.save();
+  ctx.globalAlpha = wl.t >= 1 ? 0.8 + 0.2 * Math.sin(nowS * 5) : 0.95;
+  ctx.strokeStyle = C.win; ctx.lineWidth = kind === "classic" ? 12 : 13;
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.shadowColor = C.win; ctx.shadowBlur = 18;
+  ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+  ctx.restore();
+}
+function drawStatus() {
+  ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = C.ink;
+  ctx.font = "800 23px -apple-system, sans-serif";
+  var main, sub;
+  if (app.over) {
+    main = app.over.winner === "X" ? "YOU WIN" : app.over.winner === "O" ? "AI WINS" : "DRAW";
+    sub = "";
+  } else if (app.turn === "O") {
+    var dots = new Array(1 + (Math.floor(nowS * 2.5) % 3) + 1).join(".");
+    main = "AI IS THINKING" + dots;
+    sub = "";
+  } else {
+    main = "YOUR TURN";
+    sub = app.mode === "classic" ? "you are X \u00B7 tap any cell"
+        : (app.u && app.u.active !== null ? "play inside the glowing board" : "any open board \u00B7 you are X");
+  }
+  ctx.fillText(main, W / 2, 48);
+  if (sub) {
+    ctx.font = "600 13px -apple-system, sans-serif";
+    ctx.fillStyle = C.faint;
+    ctx.fillText(sub, W / 2, 74);
+  }
+  // 底部风味行
+  ctx.font = "600 12px -apple-system, sans-serif";
+  ctx.fillStyle = C.faint;
+  ctx.fillText(app.mode === "classic" ? "claim three cells in a row" : "claim small boards \u00B7 win the big board", W / 2, 618);
+}
+function drawFlash() {
+  if (app.flashT <= 0) return;
+  ctx.save();
+  ctx.strokeStyle = "rgba(217,86,74," + Math.min(1, app.flashT * 1.6) + ")";
+  ctx.lineWidth = 5; ctx.lineCap = "round";
+  var r = (app.mode === "ultimate" && app.u && app.u.active !== null) ? subRect(app.u.active) : [BX, BY, BS, BS];
+  roundRect(ctx, r[0] + 3, r[1] + 3, r[2] - 6, r[3] - 6, 12);
+  ctx.stroke();
+  ctx.restore();
+}
+function render() {
+  var bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, "#f8f3e6"); bg.addColorStop(1, "#ecdfc6");
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  drawBoardPlate();
+  if (app.screen === "play" && app.mode === "ultimate" && app.u) {
+    drawUltHighlights(nowS);
+    drawOwnedBoards();
+  }
+  drawGrid();
+  if (app.screen === "play" && app.mode === "ultimate" && app.u) drawPulses();
+  drawMarks();
+  drawWinLine();
+  drawFlash();
+  drawStatus();
+}
+
+// ---------- 主循环 ----------
+var last = 0;
+function frame(t) {
+  var dt = Math.min((t - last) / 1000, 0.05);
+  last = t; nowS = t / 1000;
+  try { update(dt); render(); } catch (e) {} // 单帧异常不让主循环挂掉
+  requestAnimationFrame(frame);
+}
+
+// ---------- 自适应 ----------
+function fit() {
+  var availW = Math.min(window.innerWidth - 12, 620);
+  var availH = window.innerHeight - 116; // 预留 HUD + 页脚
+  var sc = Math.min(availW / W, availH / H);
+  if (!isFinite(sc) || sc <= 0) sc = 0.5;
+  sc = Math.max(0.35, Math.min(sc, 1.2));
+  canvas.style.width = Math.round(W * sc) + "px";
+  canvas.style.height = Math.round(H * sc) + "px";
+}
+window.addEventListener("resize", fit);
+window.addEventListener("orientationchange", fit);
+
+fit();
+refreshMenu();
+requestAnimationFrame(frame);
+// 调试/测试钩子（不影响游戏逻辑）
+window.__ttp = app;
+</script>
+</body>
+</html>
